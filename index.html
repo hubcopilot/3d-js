@@ -2,94 +2,342 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>H4R Heartbeat Animation</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>H4R Build Animation Overlay</title>
+
+<!-- GSAP for timeline animation -->
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+
 <style>
-  html,body{
-    margin:0;padding:0;overflow:hidden;background:transparent;
-    width:100%;height:100%;
+  :root {
+    --base-size: 400px; /* overall scale of the overlay */
   }
-  .container{
-    position:relative;
-    width:600px;height:600px;
-    margin:auto;top:50%;transform:translateY(-50%);
+
+  body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow: hidden;
+    font-family: system-ui, sans-serif;
   }
-  .big-heart{
-    position:absolute;inset:0;
-    background:url('big-heart.png') no-repeat center/contain;
-    z-index:1;
-    transform-origin:center;
-    filter:drop-shadow(0 0 20px rgba(255,110,160,0.6));
+
+  /* Wrapper that you add as a Browser Source in OBS */
+  .overlay-stage {
+    position: relative;
+    width: var(--base-size);
+    height: var(--base-size);
+    /* center on transparent canvas */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
   }
-  .h4r-text{
-    position:absolute;inset:0;
-    background:url('h4r-text.png') no-repeat center/contain;
-    z-index:2;
+
+  /* We'll group everything so we can disperse as a set at the end */
+  .logo-group {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-origin: center center;
   }
-  .small-heart{
-    position:absolute;
-    width:180px;height:180px;
-    background:url('small-heart.png') no-repeat center/contain;
-    top:10%;left:70%;
-    transform-origin:center center;
-    z-index:3;
-    filter:drop-shadow(0 0 20px rgba(255,120,170,0.6));
+
+  /* Big heart base */
+  .big-heart {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 100%;
+    height: 100%;
+    transform: translate(-50%, -50%);
+    transform-origin: center center;
+  }
+
+  .big-heart img {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transform: translate(-50%, -50%);
+  }
+
+  /* The H4R text that sits on top of the big heart */
+  .h4r-text {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 60%;
+    height: 60%;
+    transform: translate(-50%, -50%);
+    transform-origin: center center;
+    /* we'll animate opacity/scale in JS */
+  }
+
+  .h4r-text img {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transform: translate(-50%, -50%);
+  }
+
+  /* The little heart in the corner */
+  .small-heart {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 40%;
+    height: 40%;
+    transform-origin: center center;
+    /* we will position it in JS to land at top-right of the big heart */
+  }
+
+  .small-heart img {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transform: translate(-50%, -50%);
+  }
+
+  /* optional subtle glow behind the whole build when "complete" */
+  .glow {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 110%;
+    height: 110%;
+    border-radius: 50%;
+    filter: blur(40px);
+    background: radial-gradient(
+      rgba(255, 70, 100, 0.4) 0%,
+      rgba(0, 0, 0, 0) 70%
+    );
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Make the canvas fill browser source nicely.
+     If you want a specific source size in OBS (like 500x500),
+     just set the Browser Source width/height there.
+  */
+  .stage-wrapper {
+    width: 100vw;
+    height: 100vh;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 </style>
 </head>
+
 <body>
-<div class="container">
-  <div class="big-heart" id="bigHeart"></div>
-  <div class="h4r-text"></div>
-  <div class="small-heart" id="smallHeart"></div>
+<div class="stage-wrapper">
+  <div class="overlay-stage">
+    <div class="logo-group" id="logoGroup">
+      <div class="glow" id="glow"></div>
+
+      <div class="big-heart" id="bigHeart">
+        <img src="big-heart.png" alt="Big Heart">
+      </div>
+
+      <div class="h4r-text" id="h4rText">
+        <img src="h4r-text.png" alt="H4R Text">
+      </div>
+
+      <div class="small-heart" id="smallHeart">
+        <img src="small-heart.png" alt="Small Heart">
+      </div>
+    </div>
+  </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
 <script>
-const bpm = 70;
-const beatDur = 60 / bpm; // ~0.857 s per beat
-const bigHeart = document.getElementById('bigHeart');
+/*
+Animation order:
+1. Reset state: bigHeart visible; text + smallHeart hidden/offscreen.
+2. Text pops in.
+3. Small heart flies in from offscreen, lands, spins 4x slowly.
+4. Glow rises.
+5. Disperse: everything drifts out & fades.
+6. Loop.
+*/
+
+const bigHeart   = document.getElementById('bigHeart');
+const h4rText    = document.getElementById('h4rText');
 const smallHeart = document.getElementById('smallHeart');
+const logoGroup  = document.getElementById('logoGroup');
+const glow       = document.getElementById('glow');
 
-function masterSequence(){
-  gsap.set(smallHeart,{x:300,y:-150,rotation:0,scale:1,opacity:1});
-  gsap.set(bigHeart,{scale:1});
+// We'll tune these numbers so the little heart "lands" near top-right.
+const LAND_X = 60;   // px offset right from center
+const LAND_Y = -120; // px offset up from center
+const START_X = 200; // offscreen start (further right/up)
+const START_Y = -260;
 
-  const tl = gsap.timeline({repeat:-1,repeatDelay:1});
+// Build GSAP timeline
+const tl = gsap.timeline({
+  repeat: -1,
+  repeatDelay: 0.5,
+  defaults: { ease: "power2.out" }
+});
 
-  // Slide In
-  tl.to(smallHeart,{duration:1.2,x:0,y:0,ease:"power2.out"});
+function setStartState() {
+  // Group is in place
+  gsap.set(logoGroup, {
+    scale: 1,
+    opacity: 1,
+    x: 0,
+    y: 0,
+    rotation: 0,
+    transformOrigin: "50% 50%"
+  });
 
-  // Spin + heartbeat sync
-  tl.add(()=>syncBeats(7),"-=0.1");
-  tl.to(smallHeart,{duration:6,rotation:360*4,ease:"none"});
+  // Big heart: already visible from frame 1
+  gsap.set(bigHeart, {
+    scale: 0.8,
+    opacity: 0,
+    rotation: 0,
+    x: 0,
+    y: 0,
+    transformOrigin: "50% 50%"
+  });
 
-  // Pause + slower heartbeats
-  tl.add(()=>syncBeats(2),"-=0.1");
-  tl.to({}, {duration:2});
+  // Text starts hidden/small
+  gsap.set(h4rText, {
+    scale: 0.5,
+    opacity: 0,
+    rotation: 0,
+    x: 0,
+    y: 0,
+    transformOrigin: "50% 50%"
+  });
 
-  // Slide Out
-  tl.to(smallHeart,{duration:1.2,x:300,y:-150,ease:"power2.in"});
+  // Small heart starts offscreen and invisible
+  gsap.set(smallHeart, {
+    scale: 0.5,
+    opacity: 0,
+    rotation: 0,
+    x: START_X,
+    y: START_Y,
+    transformOrigin: "50% 50%"
+  });
+
+  // Glow starts off
+  gsap.set(glow, {
+    opacity: 0,
+    scale: 0.6,
+    transformOrigin: "50% 50%"
+  });
 }
 
-// Both hearts pulse together every beat
-function syncBeats(beats){
-  const beatTL = gsap.timeline({repeat:beats-1});
-  beatTL.to([bigHeart,smallHeart],{
-    duration:beatDur/2,
-    scale:1.07,
-    filter:'drop-shadow(0 0 40px rgba(255,255,255,0.9))',
-    ease:"sine.inOut"
-  });
-  beatTL.to([bigHeart,smallHeart],{
-    duration:beatDur/2,
-    scale:1.0,
-    filter:'drop-shadow(0 0 20px rgba(255,120,170,0.6))',
-    ease:"sine.inOut"
-  });
-}
+// Timeline definition
+setStartState();
 
-masterSequence();
+// Step 1: Big heart fade/scale in
+tl.to(bigHeart, {
+  duration: 0.6,
+  scale: 1,
+  opacity: 1,
+  ease: "power3.out"
+}, 0);
+
+// Step 2: Text pops in after heart
+tl.to(h4rText, {
+  duration: 0.5,
+  scale: 1,
+  opacity: 1,
+  ease: "back.out(1.8)"
+}, "+=0.1");
+
+// Step 3: Small heart flies in & lands
+tl.to(smallHeart, {
+  duration: 0.7,
+  x: LAND_X,
+  y: LAND_Y,
+  scale: 1,
+  opacity: 1,
+  ease: "power3.out"
+}, "+=0.05");
+
+// Step 3b: Small heart slow spin x4 (1440deg)
+tl.to(smallHeart, {
+  duration: 4,
+  rotation: 360 * 4,
+  ease: "none"
+}, ">");
+
+// Step 4: Glow pulse on final form
+tl.to(glow, {
+  duration: 0.4,
+  opacity: 1,
+  scale: 1,
+  ease: "power2.out"
+}, "<"); // glow comes up while it's spinning
+
+// Hold final pose for a moment
+tl.to({}, {duration: 1});
+
+// Step 5: Disperse everything outward & fade
+// bigHeart drifts down-left
+tl.to(bigHeart, {
+  duration: 0.6,
+  x: -80,
+  y: 80,
+  scale: 0.4,
+  opacity: 0,
+  ease: "power2.in"
+}, "disperse");
+
+// text drifts up
+tl.to(h4rText, {
+  duration: 0.6,
+  x: 0,
+  y: -120,
+  scale: 0.4,
+  opacity: 0,
+  ease: "power2.in"
+}, "disperse");
+
+// smallHeart shoots up-right
+tl.to(smallHeart, {
+  duration: 0.6,
+  x: LAND_X + 150,
+  y: LAND_Y - 150,
+  scale: 0.4,
+  opacity: 0,
+  rotation: "+=120",
+  ease: "power2.in"
+}, "disperse");
+
+// glow fades out
+tl.to(glow, {
+  duration: 0.6,
+  opacity: 0,
+  scale: 1.2,
+  ease: "power2.in"
+}, "disperse");
+
+// Shrink the whole group slightly at the end for a cleaner reset snap
+tl.to(logoGroup, {
+  duration: 0.6,
+  scale: 0.8,
+  opacity: 0.0,
+  ease: "power2.in",
+  onComplete: () => {
+    // reset all pieces for the loop
+    setStartState();
+  }
+}, "disperse+=0");
+
+// done – timeline will repeat forever
 </script>
 </body>
 </html>
