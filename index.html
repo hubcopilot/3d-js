@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>H4R 3D Heart</title>
+  <style>
+    body { margin: 0; background: #ffbcd9; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+
+// Scene, Camera, Renderer
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 1000);
+camera.position.set(0, 0, 5);
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x000000, 0);
+document.body.appendChild(renderer.domElement);
+
+// Lighting
+const light = new THREE.DirectionalLight(0xffffff, 1.5);
+light.position.set(5, 5, 5);
+scene.add(light);
+scene.add(new THREE.AmbientLight(0xffc0cb, 0.7));
+
+// Create Heart Shape
+const x = 0, y = 0;
+const heartShape = new THREE.Shape();
+heartShape.moveTo(x + 0.25, y + 0.25);
+heartShape.bezierCurveTo(x + 0.25, y + 0.25, x + 0.20, y, x, y);
+heartShape.bezierCurveTo(x - 0.3, y, x - 0.3, y + 0.35, x - 0.3, y + 0.35);
+heartShape.bezierCurveTo(x - 0.3, y + 0.55, x - 0.1, y + 0.77, x + 0.25, y + 1.0);
+heartShape.bezierCurveTo(x + 0.6, y + 0.77, x + 0.8, y + 0.55, x + 0.8, y + 0.35);
+heartShape.bezierCurveTo(x + 0.8, y + 0.35, x + 0.8, y, x + 0.5, y);
+heartShape.bezierCurveTo(x + 0.35, y, x + 0.25, y + 0.25, x + 0.25, y + 0.25);
+
+const extrudeSettings = {
+  depth: 0.4,
+  bevelEnabled: true,
+  bevelSegments: 2,
+  steps: 2,
+  bevelSize: 0.1,
+  bevelThickness: 0.1
+};
+
+const geometry = new THREE.ExtrudeGeometry(heartShape, extrudeSettings);
+const material = new THREE.MeshStandardMaterial({
+  color: 0xff4c8b,
+  metalness: 0.3,
+  roughness: 0.2,
+});
+const heartMesh = new THREE.Mesh(geometry, material);
+heartMesh.rotation.x = Math.PI;
+scene.add(heartMesh);
+
+// Transparent “H4R” Overlay
+const textureLoader = new THREE.TextureLoader();
+const h4rTexture = textureLoader.load("h4r-text-transparent.png"); // <-- replace with your PNG path
+const h4rMaterial = new THREE.MeshBasicMaterial({
+  map: h4rTexture,
+  transparent: true,
+});
+const h4rPlane = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 2.5), h4rMaterial);
+h4rPlane.position.z = 0.25;
+scene.add(h4rPlane);
+
+// Controls
+const controls = new OrbitControls(camera, renderer.domElement);
+
+// Animation
+function animate() {
+  requestAnimationFrame(animate);
+  heartMesh.rotation.y += 0.01;
+  h4rPlane.rotation.y += 0.01;
+  renderer.render(scene, camera);
+}
+animate();
+
+// Handle resize
+window.addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
