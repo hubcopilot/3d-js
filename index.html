@@ -2,20 +2,33 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>H4R Overlay</title>
+  <title>RyaaahSlaycember Overlay</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="style.css" />
-
-  <!-- Three.js -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-
-  <!-- GSAP -->
-  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
 </head>
 <body>
-  <!-- Transparent canvas overlay -->
-  <canvas id="scene"></canvas>
+  <!-- Snow / ice particles -->
+  <canvas id="snowCanvas"></canvas>
 
-  <script src="main.js"></script>
+  <!-- Main overlay container -->
+  <div id="overlay">
+    <!-- Christmas H4R logo -->
+    <img
+      id="christmasLogo"
+      src="assets/h4r-christmas.png"
+      alt="H4R Christmas Logo"
+      draggable="false"
+    />
+
+    <!-- Icy DAY 1/60 image -->
+    <img
+      id="dayScreen"
+      src="assets/ryaahslaycember-day1-60.png"
+      alt="RyaaahSlaycember Day 1/60"
+      draggable="false"
+    />
+  </div>
+
+  <script src="script.js"></script>
 </body>
 </html>
